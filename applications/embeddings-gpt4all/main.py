@@ -1,16 +1,27 @@
-from fastapi import FastAPI
-from src import InputRequest, get_embedding, OpenAIEmbeddingOutput
-from modal import Image, Stub, asgi_app
+import modal
 
-app = FastAPI()
-stub = Stub()
+def download_model():
+    import gpt4all
+    #you can use any model from https://gpt4all.io/models/models.json
+    return gpt4all.GPT4All("ggml-gpt4all-j-v1.3-groovy.bin")
 
+image=modal.Image.debian_slim().pip_install("gpt4all").run_function(download_model)
+stub = modal.Stub("gpt4all", image=image)
+@stub.cls(keep_warm=1)
+class GPT4All:
+    def __enter__(self):
+        print("Downloading model")
+        self.gptj = download_model()
+        print("Loaded model")
 
-@app.post("/v1/embeddings", response_model=OpenAIEmbeddingOutput)
-def process_embedding(data: InputRequest):
-    return get_embedding(data)
+    @modal.method()
+    def generate(self):
+        messages = [{"role": "user", "content": "Name 3 colors"}]
+        completion = self.gptj.chat_completion(messages)
+        print(f"Completion: {completion}")
 
-
-@asgi_app()
-def fastapi_app():
-    return app
+@stub.local_entrypoint()
+def main():
+    model = GPT4All()
+    for i in range(10):
+        model.generate.call()
