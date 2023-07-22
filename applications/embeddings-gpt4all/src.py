@@ -2,29 +2,18 @@ from pydantic import BaseModel, Field
 from typing import List
 from gpt4all import Embed4All
 
-embedder = Embed4All()
-
-
 class InputRequest(BaseModel):
     input: str = Field(..., description="The input text")
-
-
-class Usage:
-    prompt_tokens: int = 0
-    total_tokens: int = 0
-
 
 class Embedding(BaseModel):
     object: str = "embedding"
     embedding: List[float]
     index: int = 0
 
-
 class OpenAIEmbeddingOutput(BaseModel):
     object: str = "list"
     data: List[Embedding]
     model: str = "gpt4all"
-    usage: Usage = Field(..., default_factory=Usage)
 
     class Config:
         schema_extra = {
@@ -45,11 +34,11 @@ class OpenAIEmbeddingOutput(BaseModel):
         }
 
 
-def get_embedding(data: InputRequest) -> OpenAIEmbeddingOutput:
+def get_embedding(data: InputRequest, embedder) -> OpenAIEmbeddingOutput:
     # Perform the embedding calculation here
-    embedding = calculate_embedding(data.input)
+    embedding = calculate_embedding(data.input, embedder)
     return OpenAIEmbeddingOutput(data=[Embedding(embedding=embedding)])
 
 
-def calculate_embedding(text) -> List[float]:
+def calculate_embedding(text, embedder) -> List[float]:
     return embedder.embed(text)

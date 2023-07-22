@@ -1,27 +1,16 @@
-import modal
+from modal import Stub, web_endpoint, Image, method
+from src import InputRequest, get_embedding, OpenAIEmbeddingOutput
+from gpt4all import Embed4All
+from pydantic import BaseModel
 
-def download_model():
-    import gpt4all
-    #you can use any model from https://gpt4all.io/models/models.json
-    return gpt4all.GPT4All("ggml-gpt4all-j-v1.3-groovy.bin")
+stub = Stub("gpt4all-embeddings")
 
-image=modal.Image.debian_slim().pip_install("gpt4all").run_function(download_model)
-stub = modal.Stub("gpt4all", image=image)
-@stub.cls(keep_warm=1)
-class GPT4All:
-    def __enter__(self):
-        print("Downloading model")
-        self.gptj = download_model()
-        print("Loaded model")
+class Input(BaseModel):
+    input: str
 
-    @modal.method()
-    def generate(self):
-        messages = [{"role": "user", "content": "Name 3 colors"}]
-        completion = self.gptj.chat_completion(messages)
-        print(f"Completion: {completion}")
-
-@stub.local_entrypoint()
-def main():
-    model = GPT4All()
-    for i in range(10):
-        model.generate.call()
+image = Image.debian_slim(python_version="3.10").pip_install_from_requirements("./requirements.txt")
+@stub.function(image=image)
+@web_endpoint(method="POST")
+def f(i: Input):
+	embedder = Embed4All()
+	return get_embedding(InputRequest(input=i.input), embedder)
